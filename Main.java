@@ -1,4 +1,5 @@
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -25,6 +26,11 @@ class User {
 
     public String getEmail() {
         return email;
+    }
+
+    @Override
+    public String toString() {
+        return name + ";" + city + ";" + email;
     }
 }
 
@@ -73,10 +79,46 @@ class Event {
 // Controller Classes
 class UserController {
     private List<User> users = new ArrayList<>();
+    private static final String USERS_FILENAME = "usuarios.data";
+
+    public UserController() {
+        loadUsersFromFile(); // Carregar usuários do arquivo ao iniciar o controlador
+    }
+
+    // Método para ler os usuários do arquivo
+    private void loadUsersFromFile() {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(USERS_FILENAME), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(";");
+                if (parts.length == 3) {
+                    String name = parts[0];
+                    String city = parts[1];
+                    String email = parts[2];
+                    User user = new User(name, city, email);
+                    users.add(user);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     public void registerUser(String name, String city, String email) {
         users.add(new User(name, city, email));
+        saveUsersToFile();
         System.out.println("Usuário registrado com sucesso: (" + name + ")");
+    }
+
+    // Método para salvar os usuários no arquivo
+    private void saveUsersToFile() {
+        try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(USERS_FILENAME), StandardCharsets.UTF_8))) {
+            for (User user : users) {
+                writer.println(user.toString());
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public List<User> getUsers() {
@@ -85,10 +127,10 @@ class UserController {
 }
 
 class ParticipationController {
-    private static final String FILENAME = "participacao.data";
+    private static final String PARTICIPATION_FILENAME = "participacao.data";
 
     public void participateEvent(String eventName, String userName) {
-        try (PrintWriter writer = new PrintWriter(new FileWriter(FILENAME, true))) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(PARTICIPATION_FILENAME, true))) {
             writer.println(eventName + ";" + userName);
             System.out.println("Participação registrada com sucesso: (" + userName + " participando de " + eventName + ")");
         } catch (IOException e) {
@@ -96,9 +138,33 @@ class ParticipationController {
         }
     }
 
+    public void cancelParticipation(String eventName, String userName) {
+        List<String> participations = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(PARTICIPATION_FILENAME))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(";");
+                if (parts.length == 2 && !parts[0].equals(eventName) && !parts[1].equals(userName)) {
+                    participations.add(line);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        try (PrintWriter writer = new PrintWriter(new FileWriter(PARTICIPATION_FILENAME))) {
+            for (String participation : participations) {
+                writer.println(participation);
+            }
+            System.out.println("Participação cancelada com sucesso: (" + userName + " cancelou a participação em " + eventName + ")");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public Map<String, Set<String>> getParticipations() {
         Map<String, Set<String>> participations = new HashMap<>();
-        try (BufferedReader reader = new BufferedReader(new FileReader(FILENAME))) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(PARTICIPATION_FILENAME))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split(";");
@@ -120,7 +186,7 @@ class EventController {
     private List<Event> events = new ArrayList<>();
     private List<String> categories = Arrays.asList("Festas", "Eventos esportivos", "Shows", "Casamentos");
 
-    private static final String FILENAME = "events.data";
+    private static final String EVENT_FILENAME = "events.data";
 
     public EventController() {
         loadEventsFromFile(); // Carregar eventos do arquivo ao iniciar o controlador
@@ -128,7 +194,7 @@ class EventController {
 
     // Método para ler os eventos do arquivo
     private void loadEventsFromFile() {
-        try (BufferedReader reader = new BufferedReader(new FileReader(FILENAME))) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(EVENT_FILENAME))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split(";");
@@ -151,15 +217,15 @@ class EventController {
         if (categories.contains(category)) {
             Event newEvent = new Event(name, address, category, dateTime, description);
             events.add(newEvent);
-            System.out.println("Evento adicionado com sucesso: (" + name + ")");
             saveEventToFile(newEvent);
+            System.out.println("Evento adicionado com sucesso: (" + name + ")");
         } else {
             System.out.println("Categoria inválida. Escolha uma das seguintes categorias: " + categories);
         }
     }
 
     private void saveEventToFile(Event event) {
-        try (PrintWriter writer = new PrintWriter(new FileWriter(FILENAME, true))) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(EVENT_FILENAME, true))) {
             writer.println(event.toString());
         } catch (IOException e) {
             e.printStackTrace();
@@ -243,8 +309,9 @@ public class Main {
             System.out.println("4. Mostrar Próximos Eventos");
             System.out.println("5. Mostrar Eventos Passado");
             System.out.println("6. Participar do Evento");
-            System.out.println("7. Listar Eventos e Usuários Participantes");
-            System.out.println("8. Sair");
+            System.out.println("7. Cancelar Participação no Evento");
+            System.out.println("8. Listar Eventos e Usuários Participantes");
+            System.out.println("9. Sair");
             System.out.print("Selecione uma Opção: ");
             String input = reader.readLine();
             if (input != null && !input.isEmpty()) {
@@ -266,7 +333,7 @@ public class Main {
                         String eventAddress = reader.readLine();
                         System.out.print("Informe a Categoria do Evento\n[Festas, Eventos esportivos, Shows, Casamentos]: ");
                         String eventCategory = reader.readLine();
-                        System.out.print("Enter event date and time (dd/MM/YYYY HH:mm): ");
+                        System.out.print("Enter event date and time (dd/MM/yyyy HH:mm): ");
                         Date eventDateTime = new Date();
                         try {
                             eventDateTime = new SimpleDateFormat("dd/MM/yyyy HH:mm").parse(reader.readLine());
@@ -298,10 +365,19 @@ public class Main {
                         participationController.participateEvent(selectedEventName, selectedUserName);
                         break;
                     case 7:
+                        Map<String, Set<String>> currentParticipations = participationController.getParticipations();
+                        eventView.displayParticipations(currentParticipations);
+                        System.out.print("Informe o Nome do Evento para cancelar a participação: ");
+                        String cancelEventName = reader.readLine();
+                        System.out.print("Informe o Nome do Usuário para cancelar a participação: ");
+                        String cancelUserName = reader.readLine();
+                        participationController.cancelParticipation(cancelEventName, cancelUserName);
+                        break;
+                    case 8:
                         Map<String, Set<String>> participations = participationController.getParticipations();
                         eventView.displayParticipations(participations);
                         break;
-                    case 8:
+                    case 9:
                         exit = true;
                         break;
                     default:
