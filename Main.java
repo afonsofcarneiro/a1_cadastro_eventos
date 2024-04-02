@@ -72,11 +72,49 @@ class Event {
 
 // Controller Classes
 class UserController {
-    public User registerUser(String name, String city, String email) {
-        return new User(name, city, email);
+    private List<User> users = new ArrayList<>();
+
+    public void registerUser(String name, String city, String email) {
+        users.add(new User(name, city, email));
+        System.out.println("Usuário registrado com sucesso: (" + name + ")");
+    }
+
+    public List<User> getUsers() {
+        return users;
     }
 }
 
+class ParticipationController {
+    private static final String FILENAME = "participacao.data";
+
+    public void participateEvent(String eventName, String userName) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(FILENAME, true))) {
+            writer.println(eventName + ";" + userName);
+            System.out.println("Participação registrada com sucesso: (" + userName + " participando de " + eventName + ")");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public Map<String, Set<String>> getParticipations() {
+        Map<String, Set<String>> participations = new HashMap<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(FILENAME))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(";");
+                if (parts.length == 2) {
+                    String eventName = parts[0];
+                    String userName = parts[1];
+                    participations.putIfAbsent(eventName, new HashSet<>());
+                    participations.get(eventName).add(userName);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return participations;
+    }
+}
 
 class EventController {
     private List<Event> events = new ArrayList<>();
@@ -155,19 +193,33 @@ class UserView {
     public void displayUser(User user) {
         System.out.println("Usuário Registrado: " + user.getName() + ", " + user.getCity() + ", " + user.getEmail());
     }
+
+    public void displayUsers(List<User> users) {
+        System.out.println("Usuários Registrados:");
+        for (User user : users) {
+            System.out.println(user.getName());
+        }
+    }
 }
 
 class EventView {
     public void displayEvents(List<Event> events) {
-        System.out.println("\nTodos os Eventos:\n");
+        System.out.println("Todos os Eventos:");
         for (Event ev : events) {
-           
             System.out.println("Nome: " + ev.getName());
             System.out.println("Endereço: " + ev.getAddress());
             System.out.println("Categoria: " + ev.getCategory());
             System.out.println("Data e Hora: " + new SimpleDateFormat("dd/MM/yyyy HH:mm").format(ev.getDateTime()));
             System.out.println("Descrição: " + ev.getDescription());
-            System.out.println("________________________________________");
+            System.out.println();
+        }
+    }
+
+    public void displayParticipations(Map<String, Set<String>> participations) {
+        System.out.println("Eventos e Usuários Participantes:");
+        for (Map.Entry<String, Set<String>> entry : participations.entrySet()) {
+            System.out.println("Evento: " + entry.getKey());
+            System.out.println("Participantes: " + entry.getValue());
             System.out.println();
         }
     }
@@ -181,6 +233,7 @@ public class Main {
         EventController eventController = new EventController();
         UserView userView = new UserView();
         EventView eventView = new EventView();
+        ParticipationController participationController = new ParticipationController();
 
         boolean exit = false;
         while (!exit) {
@@ -189,7 +242,9 @@ public class Main {
             System.out.println("3. Mostrar todos os Eventos");
             System.out.println("4. Mostrar Próximos Eventos");
             System.out.println("5. Mostrar Eventos Passado");
-            System.out.println("6. Sair");
+            System.out.println("6. Participar do Evento");
+            System.out.println("7. Listar Eventos e Usuários Participantes");
+            System.out.println("8. Sair");
             System.out.print("Selecione uma Opção: ");
             String input = reader.readLine();
             if (input != null && !input.isEmpty()) {
@@ -202,8 +257,7 @@ public class Main {
                         String city = reader.readLine();
                         System.out.print("Informe o Email: ");
                         String email = reader.readLine();
-                        User user = userController.registerUser(name, city, email);
-                        userView.displayUser(user);
+                        userController.registerUser(name, city, email);
                         break;
                     case 2:
                         System.out.print("Informe o Nome do Evento: ");
@@ -215,14 +269,12 @@ public class Main {
                         System.out.print("Enter event date and time (dd/MM/YYYY HH:mm): ");
                         Date eventDateTime = new Date();
                         try {
-                            eventDateTime = new SimpleDateFormat("dd/MM/YYYY HH:mm").parse(reader.readLine());
+                            eventDateTime = new SimpleDateFormat("dd/MM/yyyy HH:mm").parse(reader.readLine());
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
-                        System.out.print("Informe a Descriçao do Evento: ");
+                        System.out.print("Informe a Descrição do Evento: ");
                         String eventDescription = reader.readLine();
-                       
-
                         eventController.addEvent(eventName, eventAddress, eventCategory, eventDateTime, eventDescription);
                         break;
                     case 3:
@@ -235,6 +287,21 @@ public class Main {
                         eventView.displayEvents(eventController.getPastEvents());
                         break;
                     case 6:
+                        List<User> users = userController.getUsers();
+                        userView.displayUsers(users);
+                        System.out.print("Selecione um Usuário pelo Nome: ");
+                        String selectedUserName = reader.readLine();
+                        List<Event> allEvents = eventController.getAllEvents();
+                        eventView.displayEvents(allEvents);
+                        System.out.print("Selecione um Evento pelo Nome: ");
+                        String selectedEventName = reader.readLine();
+                        participationController.participateEvent(selectedEventName, selectedUserName);
+                        break;
+                    case 7:
+                        Map<String, Set<String>> participations = participationController.getParticipations();
+                        eventView.displayParticipations(participations);
+                        break;
+                    case 8:
                         exit = true;
                         break;
                     default:
@@ -244,4 +311,4 @@ public class Main {
             }
         }
     }
-} 
+}
